@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Template: replace __HOME__, __DIR__, __PORT__, __TRUSTED_HOST__ before use.
+     Save as ~/Library/LaunchAgents/com.example.dsh-phone.plist on macOS, then:
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.example.dsh-phone.plist
+     Stop:
+       launchctl bootout gui/$(id -u)/com.example.dsh-phone
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.example.dsh-phone</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>node</string>
+    <string>__DIR__/server.mjs</string>
+  </array>
+  <key>WorkingDirectory</key><string>__DIR__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    <key>HOME</key><string>__HOME__</string>
+    <key>PORT</key><string>__PORT__</string>
+    <key>UPSTREAM</key><string>http://127.0.0.1:3080</string>
+    <!-- Add TRUSTED_HOST only when DSH itself runs with --trusted-host <host:port>. -->
+    <key>TRUSTED_HOST</key><string>__TRUSTED_HOST__</string>
+    <key>TOKEN_LOG</key><string>__HOME__/.dsh/dsh-launchd.log</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key><false/>
+  </dict>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>__HOME__/dsh-phone.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/dsh-phone.log</string>
+</dict>
+</plist>

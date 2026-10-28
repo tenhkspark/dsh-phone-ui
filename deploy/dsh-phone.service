@@ -1,0 +1,22 @@
+# systemd equivalent for Linux hosts (save as ~/.config/systemd/user/dsh-phone.service)
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now dsh-phone.service
+#   journalctl --user -u dsh-phone -f
+[Unit]
+Description=DSH phone gateway
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/dsh-phone
+Environment=PORT=8450
+Environment=UPSTREAM=http://127.0.0.1:3080
+Environment=TOKEN_LOG=%h/.dsh/dsh-launchd.log
+# Only when DSH itself runs with --trusted-host <host:port>; leave commented otherwise.
+#Environment=TRUSTED_HOST=myhost.example.ts.net:8446
+ExecStart=/usr/bin/env node %h/dsh-phone/server.mjs
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

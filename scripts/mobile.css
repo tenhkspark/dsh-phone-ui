@@ -1,0 +1,183 @@
+/* DSH phone skin — overrides that only apply below the narrow-screen breakpoint.
+ *
+ * Everything here is scoped to :root.dshm (added by mobile.js) and lives inside a
+ * max-width query, so a wide window keeps the stock desktop layout untouched.
+ *
+ * Selectors target DSH's data-slot attribute names on purpose: the CSS-module class
+ * names carry a hash and change between builds, the slot names are stable.
+ * Check with `document.querySelectorAll('[data-slot]')` if a DSH update breaks this.
+ *
+ * Tuning: this block was written against a CSS viewport of 440x956 (iPhone Pro Max
+ * class). Other phones differ — see "Tune it to your phone" in README.md.
+ */
+
+/* Hidden by default: the injected elements only appear inside the narrow-screen block
+ * below. Without this they would render as bare DOM on a wide window. */
+#dshm-burger,
+#dshm-scrim {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  /* ---- base ---------------------------------------------------------- */
+  :root.dshm {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    height: 100%;
+    overscroll-behavior: none;
+  }
+  :root.dshm body {
+    height: 100%;
+    overflow-x: hidden;
+  }
+  /* mobile.js writes --dshm-vh so the app shrinks to the visible box when the
+     on-screen keyboard opens (the layout viewport does not shrink by itself). */
+  :root.dshm body [data-slot="root"] > div[data-sidebar-collapsed] {
+    grid-template-columns: 0px minmax(0, 1fr) 0px !important;
+    height: var(--dshm-vh, 100dvh) !important;
+    /* keep the notch and the home indicator clear in fullscreen/PWA mode */
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    box-sizing: border-box;
+    transition: height .12s ease-out;
+  }
+  :root.dshm [data-slot="main.conversation"],
+  :root.dshm [data-slot="conversation.session"] {
+    min-width: 0;
+  }
+
+  /* ---- left rail / sidebar: slide-over instead of a permanent column ---- */
+  :root.dshm [data-slot="sidebar"] {
+    display: block !important; /* stock markup sets display:contents inline */
+    position: fixed !important;
+    inset: 0 auto 0 0;
+    width: min(320px, 86vw) !important;
+    z-index: 60;
+    transform: translateX(-102%);
+    transition: transform .2s ease;
+    background: var(--dsw-alias-bg-module-platform, #17171a);
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    border-right: .5px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, .08));
+    visibility: hidden;
+  }
+  :root.dshm.dshm-sb-open [data-slot="sidebar"] {
+    transform: none;
+    visibility: visible;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, .55);
+  }
+  :root.dshm [data-slot="sidebar"] button {
+    min-height: 40px;
+  }
+
+  /* scrim behind the open sidebar */
+  :root.dshm #dshm-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(0, 0, 0, .45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease;
+  }
+  :root.dshm.dshm-sb-open #dshm-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* floating hamburger (replaces the rail that the rule above hid) */
+  :root.dshm #dshm-burger {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0) + 6px);
+    left: 8px;
+    z-index: 50;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: .5px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, .12));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, #17171a) 82%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    color: var(--dsw-alias-label-primary, #e8e8ea);
+    cursor: pointer;
+    transition: opacity .16s ease, transform .16s ease;
+  }
+  :root.dshm #dshm-burger svg { width: 20px; height: 20px; display: block; }
+  :root.dshm.dshm-sb-open #dshm-burger {
+    opacity: 0;
+    transform: scale(.9);
+    pointer-events: none;
+  }
+
+  /* leave room for the hamburger in the header row.
+     Note: do NOT put overflow:hidden on that row — with this padding the right-hand
+     icon ends up 16px outside the row and would be clipped. */
+  :root.dshm [data-slot="conversation.header.leading"],
+  :root.dshm [data-slot="conversation.session.header"] > *:first-child {
+    padding-left: 46px;
+  }
+
+  /* ---- composer ------------------------------------------------------ */
+  /* iOS zooms a focused editable whose font-size is below 16px */
+  :root.dshm [contenteditable="true"] {
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+  }
+  /* the chips live under composer.bar, not under input.dock (dock is display:contents) */
+  :root.dshm [data-slot="conversation.composer.bar"] button,
+  :root.dshm [data-slot="conversation.composer.bar"] [role="button"],
+  :root.dshm [data-slot="conversation.input.dock"] button,
+  :root.dshm [data-slot="conversation.input.dock"] [role="button"] {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  :root.dshm [data-slot="conversation.input.model.label"] {
+    max-width: 46vw;
+  }
+  :root.dshm button,
+  :root.dshm [role="button"],
+  :root.dshm a {
+    touch-action: manipulation;
+  }
+
+  /* ---- long content scrolls sideways instead of overflowing ---------- */
+  :root.dshm pre,
+  :root.dshm table {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  :root.dshm pre { font-size: 12.5px; line-height: 1.5; }
+
+  /* ---- raise the floor for list/menu rows ---------------------------- */
+  :root.dshm [role="menuitem"],
+  :root.dshm [role="option"] {
+    min-height: 40px;
+  }
+
+  /* ---- conversation header + per-message action icons ---------------- */
+  :root.dshm [data-slot="conversation.session.header"] {
+    gap: 2px;
+  }
+  :root.dshm [data-slot="conversation.session.header"] button,
+  :root.dshm [data-slot="conversation.session.header"] [role="button"] {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  :root.dshm [data-slot="conversation.session"] button,
+  :root.dshm [data-slot="conversation.session"] [role="button"] {
+    min-width: 34px;
+    min-height: 34px;
+  }
+  /* token/step counters are unreadably small on a phone */
+  :root.dshm [data-slot="conversation.chat.turnTail"],
+  :root.dshm [data-slot="conversation.input.activity"] {
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+}
