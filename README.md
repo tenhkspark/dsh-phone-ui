@@ -16,7 +16,7 @@ phone ──HTTPS──▶ private-network proxy (tailscale serve, :8450)
                         │
                         ▼
                  dsh-phone gateway  (this repo, 127.0.0.1:8450)
-                   ├── /m              → 302 to /?token=<current DSH token>
+                   ├── /m              → 302 to / (the gateway signs in for you)
                    ├── /__dshm/*.css   → the phone stylesheet
                    ├── /__dshm/*.js    → the phone script
                    ├── /__dshm/status  → health JSON
@@ -50,8 +50,9 @@ a rename in a later DSH build can still break the skin (see the limits below).
 - The app is sized to the *visible* box, so the composer stays above the on-screen
   keyboard (`visualViewport`)
 - Safe-area padding for fullscreen/PWA mode, plus home-screen icon/manifest routes
-- A fixed entry URL (`/m`) that resolves to the current token — a home-screen shortcut
-  keeps working after DSH restarts and rotates its token
+- A fixed entry URL (`/m`) that signs in for you: the gateway keeps DSH's session cookie
+  and presents it, so a home-screen shortcut survives a DSH restart, a rotated token, or
+  a phone browser that dropped (or kept replaying) its cookie
 - Long code blocks and tables scroll sideways instead of overflowing the page
 
 ## Requirements
@@ -106,7 +107,8 @@ a rename in a later DSH build can still break the skin (see the limits below).
 
 6. On the phone, open `https://<your-host>:8450/m`, then use the browser's
    "Add to Home Screen". The `/m` entry survives token rotation; a URL with a hard-coded
-   token does not.
+   token does not, and a stale cookie no longer matters — the gateway signs in on every
+   request and replaces any `dsh-auth-*` cookie the browser sends.
 
    Optional: drop your own `apple-touch-icon-180.png`, `icon-192.png` and `icon-512.png`
    into `scripts/icons/` — the icon and manifest links are injected only when those files
@@ -138,7 +140,8 @@ you intend), and keep both files in sync. Things worth checking on a new device:
 
 ## What this does not do
 
-- It adds no authentication. It relies on DSH's own token/cookie; keep the port on a
+- It adds no authentication of its own, but it does sign in for you: anyone who can reach
+  the port gets a session, because the gateway holds DSH's cookie. Keep the port on a
   private network / behind your tunnel. Do not expose it to the internet.
 - It does not change the layout of a wide window: every rule is inside a width query gated
   by `html.dshm`, which the script only adds below the breakpoint.

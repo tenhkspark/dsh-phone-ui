@@ -11,7 +11,7 @@ DSH（DeepSeek Harness）自带一个为桌面窗口构建的 Web UI。在手机
                         │
                         ▼
                  dsh-phone 网关（本仓库，127.0.0.1:8450）
-                   ├── /m              → 302 → /?token=<当前 DSH token>
+                   ├── /m              → 302 → /（网关替你登录）
                    ├── /__dshm/*.css   → 手机用样式表
                    ├── /__dshm/*.js    → 手机用脚本
                    └── 其他所有路径    → 127.0.0.1:3080（DSH web）
@@ -36,7 +36,7 @@ DSH（DeepSeek Harness）自带一个为桌面窗口构建的 Web UI。在手机
 - 可编辑区域为 16px，因此 iOS 在聚焦时不再缩放
 - 应用按*可见*区域调整尺寸，因此 composer 会停留在屏幕键盘上方（`visualViewport`）
 - 为全屏/PWA 模式提供安全区域内边距，并增加主屏幕图标/manifest 路由
-- 固定入口 URL（`/m`）会解析到当前 token——DSH 重启并轮换 token 后，主屏幕快捷方式仍可工作
+- 固定入口 URL（`/m`）会替你登录：网关保存 DSH 的会话 cookie 并在每次请求时附上，因此 DSH 重启、token 轮换、或手机浏览器丢失/重放 cookie 时，主屏幕快捷方式仍可工作
 - 长代码块和表格横向滚动，而不是溢出页面
 
 ## 要求
@@ -81,7 +81,7 @@ DSH（DeepSeek Harness）自带一个为桌面窗口构建的 Web UI。在手机
 
    **如果你的 tailnet ACL 显式列出了允许的端口，也要在那里加入新端口。** 未列出的端口会被静默丢弃——手机显示“无法连接”，而本地一切正常。这是设置看起来坏掉的最常见原因。
 
-6. 在手机上打开 `https://<your-host>:8450/m`，然后使用浏览器的“添加到主屏幕”。`/m` 入口能在 token 轮换后继续存在；硬编码 token 的 URL 则不能。
+6. 在手机上打开 `https://<your-host>:8450/m`，然后使用浏览器的“添加到主屏幕”。`/m` 入口能在 token 轮换后继续存在；硬编码 token 的 URL 则不能，旧 cookie 也不再是问题——网关每次都会重新登录并替换浏览器发来的 `dsh-auth-*` cookie。
 
    可选：将你自己的 `apple-touch-icon-180.png`、`icon-192.png` 和 `icon-512.png` 放入 `scripts/icons/`（只有这些文件存在时才会注入图标与 manifest 链接）。不要将 DSH 标志用作你自己的应用图标——它属于 DeepSeek；请使用你自己的图片，或者不使用图标。
 
@@ -104,7 +104,7 @@ javascript:prompt('', innerWidth + 'x' + innerHeight)
 
 ## 它不做什么
 
-- 它不添加身份验证。它依赖 DSH 自己的 token/cookie；请将该端口保持在私有网络/隧道之后。不要将其暴露到互联网。
+- 它不添加自己的身份验证，但会替你登录：任何能访问该端口的人都会得到一个会话，因为网关持有 DSH 的 cookie。请将该端口保持在私有网络/隧道之后。不要将其暴露到互联网。
 - 它不改变宽窗口的布局：每条规则都位于由 `html.dshm` 控制的宽度查询内，而脚本只会在低于断点时添加该类。
 - 它不是 DSH 的 fork。选择器有意使用 DSH 的 `data-slot` 属性名（CSS module 类名会按构建哈希化），但 DSH 更新仍可能重命名 slot 并破坏皮肤。发生这种情况时，在实时页面上运行 `document.querySelectorAll('[data-slot]')` 是重建选择器列表的最快方法。
 - 它是在一台主机和一类手机上编写并检查的。尤其是键盘处理取决于设备——请在你自己的手机上验证。

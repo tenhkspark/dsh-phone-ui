@@ -3,8 +3,9 @@
  *
  * Sits in front of the DSH web server (default 127.0.0.1:3080) on its own port and:
  *   - injects a viewport meta with viewport-fit=cover + the mobile stylesheet/script
- *   - serves a fixed entry URL (/m) that redirects to the current token, so a
- *     home-screen shortcut survives restarts (DSH re-issues its token on every start)
+ *   - serves a fixed entry URL (/m) that redirects to / with the session already
+ *     established, so a home-screen shortcut survives restarts (DSH re-issues its
+ *     token on every start) and a stale or missing cookie cannot redirect-loop
  *   - rewrites Host/Origin to the host DSH was started with (--trusted-host), so a
  *     second port is not rejected by the origin check
  *
@@ -50,6 +51,45 @@ function logHit(req) {
 }
 
 /** Last token DSH printed to its log. DSH logs a URL with ?token=... on every start. */
+let authCookie = null; // "dsh-auth-<suffix>=<value>", the name DSH chose for this install
+let authAt = 0;
+
+/* Sign in once, server-side: exchange the token for DSH's cookie and reuse it.
+ * The phone never has to keep a cookie, which is what made /m -> /?token=... loop
+ * in browsers that drop or replay cookies across redirects. */
+function getAuthCookie() {
+  return new Promise((resolve) => {
+    if (authCookie && Date.now() - authAt < 3600_000) return resolve(authCookie);
+    const t = currentToken();
+    if (!t) return resolve(null);
+    const headers = { host: TRUSTED_HOST || `${UP_HOST}:${UP_PORT}` };
+    const r = http.request(
+      { hostname: UP_HOST, port: UP_PORT, path: `/?token=${encodeURIComponent(t)}`, method: 'GET', headers },
+      (res) => {
+        const sc = res.headers['set-cookie'];
+        res.resume();
+        if (sc) {
+          authCookie = (Array.isArray(sc) ? sc[0] : sc).split(';')[0];
+          authAt = Date.now();
+        }
+        resolve(authCookie);
+      },
+    );
+    r.on('error', () => resolve(null));
+    r.end();
+  });
+}
+
+/* Drop any cookie DSH would read as ours (browser copies can be stale), keep the rest. */
+function withAuthCookie(browserCookie, cookie) {
+  const kept = String(browserCookie || '')
+    .split(/;\s*/)
+    .filter((c) => c && !/^dsh-auth-/.test(c))
+    .join('; ');
+  if (!cookie) return kept;
+  return kept ? `${kept}; ${cookie}` : cookie;
+}
+
 function currentToken() {
   try {
     const txt = fs.readFileSync(TOKEN_LOG, 'utf8');
@@ -140,9 +180,8 @@ function handleLocal(req, res) {
   const pathname = (req.url || '/').split('?')[0];
 
   if (pathname === '/m' || pathname === '/m/') {
-    const tok = currentToken();
-    if (!tok) return sendText(res, 503, `no token in ${TOKEN_LOG} yet (wait for DSH to start)`);
-    res.writeHead(302, { location: `/?token=${encodeURIComponent(tok)}`, 'cache-control': 'no-store' });
+    if (!currentToken()) return sendText(res, 503, `no token in ${TOKEN_LOG} yet (wait for DSH to start)`);
+    res.writeHead(302, { location: '/', 'cache-control': 'no-store' });
     return res.end();
   }
   if (pathname === '/__dshm/status') {
@@ -162,17 +201,29 @@ function handleLocal(req, res) {
   return false;
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   logHit(req);
   if (handleLocal(req, res) !== false) return;
 
+  const cookie = await getAuthCookie();
   const headers = { ...req.headers, 'accept-encoding': 'identity' };
+  const kept = withAuthCookie(req.headers.cookie, cookie);
+  if (kept) headers.cookie = kept;
+  else delete headers.cookie;
   if (TRUSTED_HOST) headers.host = TRUSTED_HOST;
   if (TRUSTED_ORIGIN && headers.origin) headers.origin = TRUSTED_ORIGIN;
 
   const upReq = http.request(
     { hostname: UP_HOST, port: UP_PORT, path: req.url, method: req.method, headers },
     (upRes) => {
+      if (upRes.statusCode === 401 && !/[?&]relogin=1/.test(req.url || '')) {
+        authCookie = null;
+        authAt = 0;
+        upRes.resume();
+        const sep = (req.url || '/').includes('?') ? '&' : '?';
+        res.writeHead(302, { location: `${req.url}${sep}relogin=1`, 'cache-control': 'no-store' });
+        return res.end();
+      }
       const type = String(upRes.headers['content-type'] || '');
       const isHtml = /text\/html/i.test(type);
 
@@ -211,6 +262,7 @@ const server = http.createServer((req, res) => {
 /* WebSocket upgrades pass through as raw sockets (Host/Origin rewritten the same way). */
 server.on('upgrade', (req, socket, head) => {
   const headers = { ...req.headers };
+  if (authCookie) headers.cookie = withAuthCookie(headers.cookie, authCookie);
   if (TRUSTED_HOST) headers.host = TRUSTED_HOST;
   if (TRUSTED_ORIGIN && headers.origin) headers.origin = TRUSTED_ORIGIN;
   if (TRUSTED_ORIGIN && headers['sec-websocket-origin']) headers['sec-websocket-origin'] = TRUSTED_ORIGIN;
